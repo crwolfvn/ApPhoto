@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xem hình từ APplus</title>
+    <style>
+        /* minimal, clean styling */
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+        }
+        body {
+            background: #f7f9fc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 50vh;
+            margin: 0;
+            padding: 10px;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.15), 0 8px 20px -6px rgba(0, 0, 0, 0.05);
+            padding: 2rem 2rem 2rem;
+            width: 100%;
+            max-width: 1800px;
+        }
+        .input-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 1.8rem;
+        }
+        .input-row label {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #1a2639;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+        }
+        .input-row input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            border: 1.5px solid #d0d9e8;
+            border-radius: 60px;
+            outline: none;
+            background: #ffffff;
+            transition: border 0.15s, box-shadow 0.15s;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+        }
+        .input-row input:focus {
+            border-color: #2d6be4;
+            box-shadow: 0 0 0 4px rgba(45, 107, 228, 0.15);
+        }
+        .run-btn {
+            padding: 0.75rem 2.2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            background: #1e3a8a;
+            border: none;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 8px 18px -6px rgba(30, 58, 138, 0.35);
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .run-btn:hover {
+            background: #122b65;
+            box-shadow: 0 10px 22px -8px #0b1a3e;
+        }
+        .run-btn:active {
+            transform: scale(0.97);
+            background: #0e1f4a;
+        }
+        .separator {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 1.5rem 0 1.8rem;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: 6px;
+            color: #5470a6;
+            user-select: none;
+            line-height: 1;
+        }
+        .separator span {
+            background: #eef2f8;
+            padding: 0 6px;
+            border-radius: 40px;
+            font-size: 1.8rem;
+            line-height: 1;
+            color: #1e3a8a;
+        }
+        .canvas-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f0f4fb;
+            border-radius: 18px;
+            padding: 16px;
+            border: 1px solid #d9e1ef;
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.02);
+            min-height: 800px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-width: 1200px;
+            border-radius: 12px;
+            background: #ffffff;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+            transition: opacity 0.2s;
+        }
+        .status {
+            margin-top: 12px;
+            font-size: 0.9rem;
+            color: #4e5f7a;
+            text-align: center;
+            min-height: 1.5rem;
+            word-break: break-word;
+        }
+        .status.error {
+            color: #b22234;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <!-- Item : [ inputbox ] -->
+    <div class="input-row">
+        <label for="itemInput">Item :</label>
+        <input type="text" id="itemInput" placeholder="e.g. product123, test-image, ảnh-đẹp" value="Item nr" autocomplete="off" spellcheck="false" onfocus="this.select()">
+        <!-- Button: RUN -->
+        <button class="run-btn" id="runBtn">RUN</button>
+    </div>
+
+    <!-- Khung canvas load hình ảnh -->
+    <div class="canvas-wrapper">
+        <canvas id="imageCanvas" width="6000" height="4000"></canvas>
+    </div>
+    <div id="statusMessage" class="status"></div>
+</div>
+
+<script>
+    (function() {
+        // Lấy các phần tử DOM
+        const inputField = document.getElementById('itemInput');
+        const runButton = document.getElementById('runBtn');
+        const canvas = document.getElementById('imageCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('statusMessage');
+
+        // Hàm hiển thị trạng thái
+        function setStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            if (isError) {
+                statusDiv.classList.add('error');
+            } else {
+                statusDiv.classList.remove('error');
+            }
+        }
+
+        // Xóa canvas và hiển thị thông báo chờ
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Nền nhẹ để thấy canvas trống
+            ctx.fillStyle = '#fafcff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Vẽ placeholder text
+            ctx.font = 'bold 66px system-ui, sans-serif';
+            ctx.fillStyle = '#b0bedb';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⏳ Đang tải hình ảnh...', canvas.width / 2, canvas.height / 2);
+        }
+
+        // Vẽ ảnh lên canvas (fit trong khi giữ tỉ lệ)
+        function drawImageOnCanvas(img) {
+            // Lấy kích thước canvas hiển thị (có thể responsive)
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+
+            // Tính toán kích thước để ảnh vừa vặn trong canvas, giữ tỉ lệ
+            const imgRatio = img.width / img.height;
+            const canvasRatio = canvasWidth / canvasHeight;
+
+            let drawWidth, drawHeight, offsetX, offsetY;
+
+            if (imgRatio > canvasRatio) {
+                // Ảnh rộng hơn canvas → fit theo chiều rộng
+                drawWidth = canvasWidth;
+                drawHeight = canvasWidth / imgRatio;
+                offsetX = 0;
+                offsetY = (canvasHeight - drawHeight) / 2;
+            } else {
+                // Ảnh cao hơn canvas → fit theo chiều cao
+                drawHeight = canvasHeight;
+                drawWidth = canvasHeight * imgRatio;
+                offsetX = (canvasWidth - drawWidth) / 2;
+                offsetY = 0;
+            }
+
+            // Xóa canvas và vẽ nền trắng (tránh viền đen nếu ảnh trong suốt)
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            // Vẽ ảnh với kích thước đã tính
+            ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+        }
+
+        // Hàm tải hình ảnh từ URL được xây dựng từ input
+        function loadImageFromInput() {
+            // Lấy giá trị input, loại bỏ khoảng trắng thừa
+            const rawValue = inputField.value.trim();
+
+            // Nếu input rỗng, thông báo và không tải
+            if (rawValue === '') {
+                setStatus('⚠️ Vui lòng nhập nội dung (Item).', true);
+                clearCanvas();
+                // Vẽ lại placeholder cảnh báo
+                ctx.font = 'bold 66px system-ui, sans-serif';
+                ctx.fillStyle = '#b22234';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Nhập nội dung để tải ảnh', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+
+            // Xây dựng URL: https://ap.moba.cc/APplusProd7/DocLib/{nội dung inputbox}.jpg
+            // Lưu ý: giữ nguyên nội dung (có thể encode URI để an toàn, nhưng yêu cầu là "nội dung inputbox" 
+            // -> ta dùng encodeURIComponent để xử lý ký tự đặc biệt, khoảng trắng,... nhưng vẫn giữ nguyên đường dẫn)
+            // Tuy nhiên, để đúng yêu cầu "nội dung inputbox.jpg" (nếu input có dấu cách thì trình duyệt vẫn gửi được nếu encode)
+            // Dùng encodeURIComponent để tránh lỗi.
+            const encodedItem = encodeURIComponent(rawValue);
+            const imageUrl = `https://ap.moba.cc/APplusProd7/DocLib/${encodedItem}.jpg`;
+
+            // Hiển thị trạng thái đang tải
+            setStatus(`Đang tải: ${rawValue}.jpg ...`);
+            clearCanvas();
+
+            // Tạo đối tượng Image mới
+            const img = new Image();
+
+            // Xử lý khi ảnh tải thành công
+            img.onload = function() {
+                // Vẽ lên canvas
+                drawImageOnCanvas(img);
+                setStatus(`✅ Đã tải: ${rawValue}.jpg  (${img.width}×${img.height})`);
+            };
+
+            // Xử lý lỗi (không tìm thấy ảnh, lỗi mạng, v.v.)
+            img.onerror = function() {
+                // Hiển thị thông báo lỗi trên canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#fef2f2';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.font = 'bold 18px system-ui, sans-serif';
+                ctx.fillStyle = '#b22234';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('❌ Không tải được hình ảnh', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.font = '14px system-ui, sans-serif';
+                ctx.fillStyle = '#7a3e3e';
+                ctx.fillText(`URL: ${imageUrl}`, canvas.width / 2, canvas.height / 2 + 25);
+
+                setStatus(`Lỗi: không tìm thấy ảnh cho "${rawValue}". Kiểm tra lại nội dung.`, true);
+            };
+
+            // Bắt đầu tải ảnh (thêm tham số chống cache nếu cần, nhưng để đơn giản thì không)
+            img.src = imageUrl;
+        }
+
+        // Gán sự kiện cho nút RUN
+        runButton.addEventListener('click', loadImageFromInput);
+
+        // Cho phép nhấn Enter trong input cũng kích hoạt RUN
+        inputField.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                loadImageFromInput();
+            }
+        });
+
+        // Khởi tạo: vẽ canvas trống với thông báo mặc định (không tự động tải)
+        function initCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#fafcff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'bold 66px system-ui, sans-serif';
+            ctx.fillStyle = '#9aaec9';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Type and RUN', canvas.width / 2, canvas.height / 2);
+            setStatus('Sẵn sàng — nhập nội dung và nhấn RUN.');
+        }
+
+        initCanvas();
+
+        // (Tuỳ chọn) Tự động tải lần đầu với giá trị mặc định "anh1" 
+        // -> bỏ comment nếu muốn tự chạy ngay khi mở trang
+        // setTimeout(() => loadImageFromInput(), 100);
+        // Nhưng để tránh request không cần thiết khi mở trang, ta không tự động gọi.
+        // Người dùng có thể nhấn RUN.
+        // Tuy nhiên, để trải nghiệm mượt hơn, có thể tự động tải với giá trị mặc định "anh1"?
+        // Yêu cầu không bắt buộc, nên để người dùng chủ động.
+        // Nhưng nếu muốn thử ngay: gọi loadImageFromInput() một lần.
+        // Tôi sẽ gọi sau 150ms để giao diện ổn định.
+        // Nhưng lưu ý: nếu ảnh "anh1" không tồn tại sẽ hiện lỗi, cũng tốt để demo.
+        // Tôi sẽ gọi để minh hoạ, nhưng nếu bạn không muốn thì xoá dòng dưới.
+        // Tôi sẽ giữ vì nó thể hiện chức năng hoạt động ngay.
+        // Tuy nhiên, để tránh lỗi 404 không đáng có, tôi sẽ comment và dùng nút RUN thủ công.
+        // Quyết định: KHÔNG tự động tải — người dùng nhấn RUN.
+        // Nhưng để canvas không trống trải, tôi đã vẽ placeholder.
+        // Vẫn giữ nguyên.
+    })();
+</script>
+</body>
+</html>
